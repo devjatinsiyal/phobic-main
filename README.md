@@ -16,7 +16,7 @@ git clone https://github.com/oceans404/fullstack-zkevm
 Install dependencies and start react app
 
 ```shell
-cd fullstack-zkevm
+cd phobic-main
 npm i
 npm start
 ```
