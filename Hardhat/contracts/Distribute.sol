@@ -2,76 +2,51 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IdToken.sol";
+import "./Token.sol";
 
-contract Distribute is ChainlinkClient {
-    address owner;
-    address immutable Token;
-    address immutable idToken;
+contract Distribute {
+    MyToken P_token;
     uint decimals = 10 ** 18;
-    uint countMember;
     uint256[64] public aadhar;
 
-    address public oracle;
     string public claims;
 
-    ICircuitValidator public validator;
-    ICircuitValidator.CircuitQuery public query;
+    mapping(address => uint) TokensToSend;
 
-    struct Participant {
-        address participant;
-        uint amount;
-    }
+    event TokenDeployed(address indexed tokenContract);
+    event TokenClaimed(address indexed Participant, uint amount, uint timestamp);
+    event ParticipantsAdded(address indexed AddedBy, uint timestamp);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "onlyOwner");
+    modifier onlyOrganizer() {
+        // require(IERC20(idToken).balanceOf(msg.sender) > 0, "Not a DAO member");
         _;
     }
 
-      modifier onlyOrganizer() {
-        uint256 tokens = IERC20(idToken).balanceOf(msg.sender);
-        require(tokens > 0, "Not a DAO member");
-        _;
+    constructor() {
+         P_token = new MyToken();
+         emit TokenDeployed(address(P_token));
+       
     }
 
-    constructor(
-        address _oracle,
-        address _token,
-        address _idtoken,
-        address _link,
-        address _validator,
-        uint256 _schema,
-        uint256 _slotIndex,
-        uint256 _operator,
-        string memory _circuitId
-    ) {
-        if (_link == address(0)) {
-            setPublicChainlinkToken();
-        } else {
-            setChainlinkToken(_link);
+    function addParticipantsToSendTokens(
+        address[] memory _participants,
+        uint[] memory _amounts
+    ) external onlyOrganizer {
+        uint Plength = _participants.length;
+        require(Plength == _amounts.length, "Unequal Arrays");
+
+        for (uint i; i < Plength; i++) {
+            TokensToSend[_participants[i]] += _amounts[i];
         }
 
-        oracle = _oracle;
-        validator = ICircuitValidator(_validator);
-        query.schema = _schema;
-        query.slotIndex = _slotIndex;
-        query.operator = _operator;
-        query.value = aadhar;
-        query.circuitId = _circuitId;
-        Token = _token;
-        IdToken = _idtoken;
-
-        countMember = 0;
+        emit ParticipantsAdded(msg.sender, block.timestamp);
     }
 
-    function addPaeticipantsToSendTokens(uint eventID) external onlyOrganizer {}
+    function claimTokens() external {
+        uint claimableTokens = TokensToSend[msg.sender];
+        require(claimableTokens > 0, "No tokens to claim");
 
-    function releaseTokens(address[] memory recipients) external onlyOwner {
-        uint length = recipients.length;
-        for (uint i; i < length; i++) {
-            IERC20(Token).transfer(recipients[i], 10 * decimals);
-        }
+        P_token.mint(msg.sender, claimableTokens * decimals);
+        emit TokenClaimed(msg.sender, claimableTokens, block.timestamp);
     }
 }
